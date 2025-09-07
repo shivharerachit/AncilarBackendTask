@@ -1,1 +1,5 @@
 Flask
+flask-login 
+flask-sqlalchemy
+email-validator
+python-dotenv
