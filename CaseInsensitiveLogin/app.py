@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, g
+from werkzeug.security import generate_password_hash, check_password_hash
 from email_validator import validate_email, EmailNotValidError
 import os
 from dotenv import load_dotenv
@@ -24,6 +25,7 @@ def signup():
     username = data.get("username", "").lower()
     email = data.get("email", "")
     password = data.get("password", "")
+    hashed_password = generate_password_hash(password)
 
     fetchUsername = cur.execute("SELECT * FROM users WHERE username=? ", (username,))
     fetchUsername = cur.fetchall()
@@ -41,18 +43,16 @@ def signup():
         emailinfo = validate_email(email, check_deliverability=False)
         email = emailinfo.normalized
         cur.execute("INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
-                    (username, email, password,))
+                    (username, email, hashed_password,))
+        get_db().commit()
         id = cur.execute("SELECT id FROM users WHERE username=?", (username,))
         id = cur.fetchone()
-
         return jsonify({"Success": "User registered successfully", "id": id})
-
-
     except EmailNotValidError as e:
         print(str(e))
-        return jsonify({"error": e})
-    except :
-        return jsonify({"Error": "An Error Occurred"})
+        return jsonify({"error": str(e)})
+    except Exception as e:
+        return jsonify({"Error": f"An Error Occurred: {str(e)}"})
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -63,15 +63,12 @@ def login():
 
     try:
         user = cur.execute("SELECT * FROM users WHERE username=?", (username,))
-        user = user.fetchone
-        return jsonify(user)
-        if user and user[2] == password:
-            return jsonify({"message": "Login successfull"}), 200
-    
-        return jsonify({"ERROR": "Wrong Password"})
-    
-    except:
-        return jsonify({"ERROR": "An Error occurred"})
+        user = user.fetchone()
+        if user and check_password_hash(user[3], password): 
+            return jsonify({"message": "Login successful"}), 200
+        return jsonify({"ERROR": "Invalid username or password"}), 401
+    except Exception as e:
+        return jsonify({"ERROR": f"An Error occurred: {str(e)}"}), 500
 
 
 
