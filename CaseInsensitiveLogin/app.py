@@ -15,6 +15,7 @@ def get_db():
     db = getattr(g, '_database', None)
     if db is None:
         db = g._database = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
     return db
 
 
@@ -25,11 +26,13 @@ def signup():
     username = data.get("username", "").lower()
     email = data.get("email", "")
     password = data.get("password", "")
+    if not password or len(password) < 6:
+        return jsonify({"error": "Password must be at least 6 characters long."}), 400
     hashed_password = generate_password_hash(password)
 
-    fetchUsername = cur.execute("SELECT * FROM users WHERE username=? ", (username,))
+    cur.execute("SELECT * FROM users WHERE username=? ", (username,))
     fetchUsername = cur.fetchall()
-    fetchEmail = cur.execute("SELECT * FROM users WHERE email=? ", (email,))
+    cur.execute("SELECT * FROM users WHERE email=? ", (email,))
     fetchEmail = cur.fetchall()
     print(fetchEmail)
 
@@ -62,9 +65,10 @@ def login():
     password = data.get("password", "")
 
     try:
-        user = cur.execute("SELECT * FROM users WHERE username=?", (username,))
-        user = user.fetchone()
-        if user and check_password_hash(user[3], password): 
+        cur.execute("SELECT * FROM users WHERE username=?", (username,))
+        user = cur.fetchone()
+        print(user)
+        if user and check_password_hash(user["password"], password): 
             return jsonify({"message": "Login successful"}), 200
         return jsonify({"ERROR": "Invalid username or password"}), 401
     except Exception as e:
